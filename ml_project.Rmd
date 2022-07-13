@@ -1,0 +1,133 @@
+---
+title: "ml_project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(667)
+library(caret)
+```
+
+
+# Data loading
+
+```{r}
+train_url <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_data <-read.csv(train_url)
+test_data <- read.csv(test_url)
+dim(train_data)
+dim(test_data)
+```
+
+Threre are 19622 training examples with 160 attributes each. We may exclude some of them.
+
+
+# Data cleaning
+
+
+At first we exclude columns with small variance, meaning that all examples have similar values.
+
+```{r}
+sim_value_cols <- nearZeroVar(train_data, saveMetrics = TRUE)
+train_data <- train_data[, !sim_value_cols$nzv]
+test_data <- test_data[, !sim_value_cols$nzv]
+dim(train_data)
+dim(test_data)
+```
+Then, we continue with columns with large number of non NaNs.
+```{r}
+cols_with_many_nans <- colSums(is.na(train_data))>10000
+train_data <- train_data[, !cols_with_many_nans]
+test_data <- test_data[, !cols_with_many_nans]
+dim(train_data)
+dim(test_data)
+
+```
+Finally we exclude columns related to timestamp, user name and user id.
+```{r}
+excluded <- c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp")
+cond <- names(train_data)!=excluded
+train_data <- train_data[, cond]
+test_data <- test_data[, cond]
+dim(train_data)
+dim(test_data)
+```
+# Splitting training data
+
+After all data preprocessing, we split our data for training and testing.
+```{r}
+inTrain <- createDataPartition(train_data$classe, p = 0.90, list = FALSE)
+validation <- train_data[-inTrain, ]
+training <- train_data[inTrain, ]
+dim(training)
+dim(validation)
+```
+
+# Modeling
+
+Now, we proceed with Machine Learning Models.
+
+### Decision Tree
+
+Our first model is a simple Decision Tree
+```{r}
+#train_control <- trainControl(method = "cv", number=10)
+tree <- train(classe ~ ., data=training, method="rpart")
+prediction = predict(tree, validation)
+accuracy_tree <- sum(prediction==validation$classe)/length(prediction)
+accuracy_tree
+```
+This model does not perform very well. Decision Trees tend to overfit on training data.
+```{r}
+confusionMatrix(as.factor(validation$classe), prediction)
+```
+#LDA
+
+Another idea could be to try  Linear Discriminant Analysis
+```{r}
+lda <- train(classe ~ ., data = training, method = "lda")
+prediction <- predict(lda, validation)
+accuracy_lda <- sum(prediction==validation$classe)/length(prediction)
+accuracy_lda
+```
+```{r}
+confusionMatrix(as.factor(validation$classe), prediction)
+```
+
+Better than Decision Tree but still poor
+
+
+### Random Forest
+
+Finally, we try Random Forest
+
+```{r}
+#train_control <- trainControl(method = "cv", number=10)
+rf <- train(classe ~ ., data=training, method="rf")
+prediction = predict(rf, validation)
+accuracy_rf <- sum(prediction==validation$classe)/length(prediction)
+accuracy_rf
+```
+```{r}
+confusionMatrix(as.factor(validation$classe), prediction)
+```
+
+
+This model performs almost excellent.
+
+# Answers for the quiz
+
+```{r}
+predict(rf, test_data)
+```
+
+
+
+
+
